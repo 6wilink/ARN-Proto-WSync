@@ -1,0 +1,6 @@
+#!/usr/bin/lua
+-- by Qige <qigezhao@gmail.com>
+
+-- 2017.12.06
+local Agent = require 'arn.service.wsync.wsync_daemon'
+Agent.Run(arg[1], arg[2], arg[3])

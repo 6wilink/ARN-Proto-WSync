@@ -1,0 +1,35 @@
+#!/bin/sh
+
+echo -n '* trying WSync Agent: '
+AGENT="/usr/sbin/arn-daemon-wsync"
+AGENT_SIG=/tmp/.signal.wsync2.tmp
+AGENT_SWAP1=/tmp/.conf.wsync2.tmp
+AGENT_SWAP2=/tmp/.stat.wsync2.tmp
+
+case $1 in
+    status|stat|now)
+        echo '(channel:timer)'
+        touch $AGENT_SWAP1; cat $AGENT_SWAP1; echo
+        echo '* status of Agent'
+        echo -n '' > $AGENT_SWAP2
+        tail -q -f $AGENT_SWAP2
+        ;;
+    clear|reset|stop)
+        echo 'configuring Agent'
+        echo -n "::cliset" > $AGENT_SWAP1
+        echo -n '' > $AGENT_SWAP2
+        ;;
+    sync|conf|set)
+        echo 'configuring Agent'
+        echo -n "$2:$3:cliset" > $AGENT_SWAP1
+        echo -n '' > $AGENT_SWAP2
+        ;;
+    end|quit|bye)
+        echo 'stopping Agent'
+        echo "stop" > $AGENT_SIG
+        ;;
+    start|begin|run|go|?|*)
+        echo 'starting Agent'
+        $AGENT >/dev/null 2>&1 &
+        ;;
+esac
