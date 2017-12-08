@@ -1,11 +1,12 @@
 -- by Qige <qigezhao@gmail.com>
 -- 2017.12.08 
 
-local DBG = print
---local DBG = function(msg) end
+--local DBG = print
+local DBG = function(msg) end
 
 local Socket = require 'socket'
 local ARNMngr = require 'arn.device.mngr'
+local RARP      = require 'arn.utils.rarp'
 
 local sfmt = string.format
 local tbl_push = table.insert
@@ -42,7 +43,25 @@ end
 
 function WSync2Comm.fetchAllPeersIP()
     local hosts = {}
-    tbl_push(hosts, '192.168.1.165')
+    local safe_all = ARNMngr.SAFE_GET()
+    if (safe_all) then
+        local abb = safe_all.abb_safe
+        if (abb) then
+            local peer_qty = abb.peer_qty
+            local peers = abb.peers
+            if (peer_qty and peers and peer_qty > 0) then
+                for _,p in ipairs(peers) do
+                    local pwmac = p.wmac
+                    if (pwmac) then
+                        local pip = RARP.FETCH_IP(pwmac, 'iponly')
+                        if (pip) then
+                            tbl_push(hosts, pip)
+                        end
+                    end
+                end
+            end
+        end
+    end
     return hosts
 end
 
@@ -75,8 +94,8 @@ end
 
 function WSync2Comm.tellPeerMsg(sockfd, host, port, msg)
     if (sockfd and host and port and msg) then
-        DBG(sfmt('==> send [%s] to %s:%s', msg, host, port))
-        sockfd:sendto(msg, host, port)
+        print(sfmt('--------# send [%s] to %s:%s', msg, host, port))
+        sockfd:sendto(msg, socket.dns.toip(host), port)
     end
 end
 

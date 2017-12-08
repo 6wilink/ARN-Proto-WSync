@@ -7,7 +7,6 @@ local DBG = print
 local CCFF      = require 'arn.utils.ccff'
 local ARNMngr   = require 'arn.device.mngr'
 local TOKEN     = require 'arn.service.wsync.v2.util_token'
-local RARP      = require 'arn.utils.rarp'
 
 local exec  = CCFF.execute
 local ssplit = CCFF.split
@@ -66,7 +65,7 @@ end
 function WSync2Agent.instant:Prepare(timeout, port, protocol)
     DBG(sfmt("Agent.instant:Prepare(%s)", timeout or '-'))
     
-    if ((not ARNMngr) or (not RARP)) then
+    if ((not ARNMngr)) then
         return 'error: need packet ARN-Scripts'
     end
     
