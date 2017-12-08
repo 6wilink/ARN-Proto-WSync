@@ -170,13 +170,14 @@ function WSync2Agent.writeLocalConfig(stdin, msg)
     local flagLocalUserDefined = string.find(lmtype, 'cliset')
     if (msg and lmtype and (not flagLocalUserDefined)) then
         fwrite(stdout, s)
-        fwrite(stdin, msg)
+        fwrite(stdin, msg..'\n')
     end
 end
 
 function WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
     WSync2Agent.sayStatus(stdout, status)
     WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
+    print('----'..status)
 end
 
 -- check local config type before write
@@ -288,7 +289,6 @@ function WSync2Agent.instant:TaskLocalCountdown(
                             channel or '-')
                 end
                 WSync2Agent.sayStatusAppend(stdout, msg)
-                print('====' .. msg)
 
                 -- save for next loop
                 ltimeout = ltimeout - 1
