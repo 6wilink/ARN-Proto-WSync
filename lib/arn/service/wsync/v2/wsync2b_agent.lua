@@ -35,25 +35,25 @@ WSync2Agent.instant = {}
 WSync2Agent.instant.__index = WSync2Agent.instant -- OOP liked(1/2)
 
 function WSync2Agent.New(
-    protocol, port, 
+    protocol, port,
     interval, flagLoop
 )
     local instant = {}
     setmetatable(instant, WSync2Agent.instant) -- OOP liked(2/2)
-    
+
     instant.VERSION = WSync2Agent.VERSION
     instant.conf = {}
     instant.conf.protocol = protocol or 'udp'
     instant.conf.port = port or 3003
     instant.conf.interval = interval or 1
     instant.conf.flagLoop = flagLoop
-    
+
     -- Resource
     instant.res = {}
     instant.res.channels = nil
     instant.res.timeouts = nil
     instant.res.loops = 0
-    
+
     instant.cache = {}
     instant.cache.index = 1
     instant.cache.target = nil
@@ -64,35 +64,35 @@ end
 
 function WSync2Agent.instant:Prepare(timeout, port, protocol)
     DBG(sfmt("Agent.instant:Prepare(%s)", timeout or '-'))
-    
+
     if ((not ARNMngr)) then
         return 'error: need packet ARN-Scripts'
     end
-    
+
     if ((not WSync2Agent.Comm) or (not WSync2Agent.Comm.Env())) then
         return 'error: utility wsync2 comm failed'
     end
-    
+
     -- enable run again & again
     if (self.conf.flagLoop == 'on' and self.conf.flagLoop == '1') then
         self.conf.flagLoop = 1
     else
         self.conf.flagLoop = 0
     end
-    
+
     -- init socket
     local sockfd = WSync2Agent.Comm.Socket(timeout, port, protocol)
     if (not sockfd) then
         return 'error: bad local socket'
     end
     self.res.sockfd = sockfd
-    
+
     -- init TOKEN
     local token = self:tokenGenerate()
     if (not token) then
         return 'error: cannot calc local token'
     end
-    
+
     self.res.TOKEN = token
     self.res.ts = ts()
     return nil
@@ -103,7 +103,7 @@ function WSync2Agent.instant:AllParamsReset()
     self.res.loops = 0
     self.res.channels = nil
     self.res.timeouts = nil
-    
+
     self.cache.index = 1
     self.cache.timeout = nil
 end
@@ -140,7 +140,7 @@ function WSync2Agent.parseConfig(config, idx, flagTable)
         if (not flagTable) then
             return vs
         end
-        
+
         if (vs) then
             local vl = ssplit(vs, ',')
             return vl
@@ -165,7 +165,8 @@ function WSync2Agent.writeLocalConfig(stdin, msg)
     local lmsg = fread(stdin)
     local lmtype = WSync2Agent.GetMsgType(lmsg)
     DBG(sfmt('### local config: %s, mtype: %s', lmsg or '-', lmtype or '-'))
-    if (msg and lmtype and lmtype ~= 'cliset') then
+    -- overwrite local config if not user defined
+    if (msg and lmtype ~= 'cliset') then
         fwrite(stdout, s)
         fwrite(stdin, msg)
     end
@@ -182,13 +183,12 @@ function WSync2Agent.instant:TaskLanSync(
     stdin, stdout
 )
     local msg, host, port = WSync2Agent.Comm.HearFromAllPeers(self.res.sockfd)
-    local s = sfmt('# heard from: %s:%s [%s]\n', 
+    local s = sfmt('# heard from: %s:%s [%s]\n',
             host or '-', port or '-', msg or '-', dt())
     DBG('========' .. s)
-    
+
     WSync2Agent.writeLocalConfig(stdin, msg)
 end
-
 
 function WSync2Agent.instant:TaskLocalCountdown(
     uinput, stdout
@@ -200,20 +200,20 @@ function WSync2Agent.instant:TaskLocalCountdown(
 
     local channels = WSync2Agent.GetChannels(uinput)
     local timeouts = WSync2Agent.GetTimers(uinput)
-    
+
     self.res.channels = channels
     self.res.timeouts = timeouts
-        
+
     if (not self.cache.index) then
         self.cache.index = 1
     end
-    
+
     DBG(sfmt("self: f %s, loop %s", self.conf.flagLoop, self.res.loops or '-'))
-    DBG(sfmt("self: %s, cache.timeout = %s, cache.targe = %s", 
-            self.cache.index or '-', 
-            self.cache.timeout or '-', 
+    DBG(sfmt("self: %s, cache.timeout = %s, cache.targe = %s",
+            self.cache.index or '-',
+            self.cache.timeout or '-',
             self.cache.target or '-'))
-    
+
     if (channels and timeouts) then
         -- in case two table size
         local sizeChannelsList = #channels or 0
@@ -225,7 +225,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
         if ((not i) or i < 0) then
             i = 1
         end
-        
+
         if (i > sizeChannelsList) then
             i = sizeChannelsList
 
@@ -247,7 +247,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
         end
         -- find valid timeout
         local timeout = timeouts[i] - 1
-        
+
         -- check cache timeout
         i = self.cache.index -- reload index, remove list size filter
         local ltimeout = tonumber(self.cache.timeout) or tonumber(timeout) or 30
@@ -260,10 +260,10 @@ function WSync2Agent.instant:TaskLocalCountdown(
         if (ltimeout < 0 or ltimeout > timeout) then
             ltimeout = timeout
         end
-        
+
         -- allow multi-loops running, or only first loop
         if (self.res.loops < 1 or self.res.flagLoop) then
-            DBG(sfmt('------# doing wsync [%s in %s/%ss]', 
+            DBG(sfmt('------# doing wsync [%s in %s/%ss]',
                     channel or '-', ltimeout or '-', timeout or '-'))
 
             -- tell all peer(s)
@@ -272,19 +272,19 @@ function WSync2Agent.instant:TaskLocalCountdown(
 
             -- switch channel when timeup!
             WSync2Agent.doSwitchChannel(channel, ltimeout)
-            
+
             -- save stat to tmp file
             local msg = nil
             if (ltimeout > 0) then
-                msg = sfmt('- T- %s: switch to ch%s in %ss', 
+                msg = sfmt('- T- %s: switch to ch%s in %ss',
                         timeout or '-', channel or '-', ltimeout or '-')
             else
-                msg = sfmt('- Now! switching ch%s ...', 
+                msg = sfmt('- Now! switching ch%s ...',
                         channel or '-')
             end
             WSync2Agent.sayStatusAppend(stdout, msg)
             print('====' .. msg)
-            
+
             -- save for next loop
             ltimeout = ltimeout - 1
             self.cache.target = channel
@@ -300,7 +300,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
         self.cache.index = i
     else
         DBG('------# bad channels or timeouts list (reason invalid channels/timeouts)')
-        
+
         local msg = '::m_hold'
         local status = '- idle (reason invalid channels/timeouts)'
         WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
@@ -339,9 +339,9 @@ function WSync2Agent.instant:tokenGenerate()
     local tokenKey = sfmt(fmtTokenKey, devWmac)
 
     local token = TOKEN.WSyncToken(tokenKey)
-    
+
     DBG(sfmt('token=%s,key=%s', token, tokenKey))
-    
+
     return token
 end
 
