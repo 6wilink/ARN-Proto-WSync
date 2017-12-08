@@ -28,7 +28,7 @@ WSync.conf.enabled = cget('arn-wsyncd','v2','enabled') or '0'
 WSync.conf.flagLoop = cget('arn-wsyncd','v2','loop') or '0'
 WSync.conf.protocol = cget('arn-wsyncd','v2','protocol') or 'udp'
 WSync.conf.port = cget('arn-wsyncd','v2','port') or 3003
-WSync.conf.interval = cget('arn-wsyncd','v2','interval') or 1
+WSync.conf.interval = 5--cget('arn-wsyncd','v2','interval') or 1
 WSync.conf.channel = nil
 WSync.conf.timeout = nil
 WSync.conf._STDOUT = nil
@@ -133,9 +133,9 @@ function WSync.Run()
             -- recv msg & save
             local msg = DaemonAgent:TaskLanSync(stdin, stdout)
             if (msg) then
-                WSync.reply(sfmt("--> Heard: [%s] at %s", msg or '', dt()))
+                WSync.reply(sfmt("====# Heard: [%s] at %s", msg or '', dt()))
             else
-                WSync.reply(sfmt("--> Heard: timeout at %s", dt()))
+                WSync.reply(sfmt("====# Heard: timeout at %s", dt()))
             end
             
             -- read user input

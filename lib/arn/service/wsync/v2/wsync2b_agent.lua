@@ -273,6 +273,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
                 -- tell all peer(s)
                 local msg = sfmt('%s:%s:m_set\n', channel or '', ltimeout or '')
                 WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
+                print('====# tell every peer(s): ' .. msg)
 
                 -- switch channel when timeup!
                 WSync2Agent.doSwitchChannel(channel, ltimeout)
