@@ -1,13 +1,9 @@
 -- by Qige <qigezhao@gmail.com>
 -- 2017.10.20 ARN iOMC v3.0-alpha-201017Q
 
---local DBG = print
-local DBG = function(msg) end
+local DBG = print
+--local DBG = function(msg) end
 
-local DBG_COMM = print
---local DBG_COMM = function(msg) end
-
-local Socket    = require 'socket'
 local CCFF      = require 'arn.utils.ccff'
 local ARNMngr   = require 'arn.device.mngr'
 local TOKEN     = require 'arn.service.wsync.v2.util_token'
@@ -18,6 +14,8 @@ local ssplit = CCFF.split
 local fwrite = CCFF.file.write
 local fread = CCFF.file.read
 local striml = CCFF.triml
+local tbl_push = table.insert
+
 local sfmt  = string.format
 local schar = string.char
 local sbyte = string.byte
@@ -28,6 +26,8 @@ local dt    = function() return os.date('%X %x') end
 
 local WSync2Agent = {}
 WSync2Agent.VERSION = 'ARN-Agent-WSync v2.0-alpha-20171206Q'
+
+WSync2Agent.Comm = require 'arn.service.wsync.v2.util_comm'
 
 WSync2Agent.conf = {}
 WSync2Agent.conf.fmtTokenKey = "6W+ARN+%s"
@@ -63,11 +63,15 @@ function WSync2Agent.New(
     return (instant)
 end
 
-function WSync2Agent.instant:Prepare(timeout, port)
+function WSync2Agent.instant:Prepare(timeout, port, protocol)
     DBG(sfmt("Agent.instant:Prepare(%s)", timeout or '-'))
     
     if ((not ARNMngr) or (not RARP)) then
         return 'error: need packet ARN-Scripts'
+    end
+    
+    if ((not WSync2Agent.Comm) or (not WSync2Agent.Comm.Env())) then
+        return 'error: utility wsync2 comm failed'
     end
     
     -- enable run again & again
@@ -78,22 +82,9 @@ function WSync2Agent.instant:Prepare(timeout, port)
     end
     
     -- init socket
-    if (not Socket) then
-        return 'error: need packet luasocket'
-    end
-    local sockfd = Socket.udp()
+    local sockfd = WSync2Agent.Comm.Socket(timeout, port, protocol)
     if (not sockfd) then
         return 'error: bad local socket'
-    end
-    local ret = sockfd:settimeout(timeout or 0.1)
-    if (not ret) then
-        sockfd:close()
-        return 'error: set socket opt(timeout) failed'
-    end
-    ret = sockfd:setsockname('*', port)
-    if (not ret) then
-        sockfd:close()
-        return 'error: set socket opt(bind) failed'
     end
     self.res.sockfd = sockfd
     
@@ -111,12 +102,13 @@ end
 function WSync2Agent.instant:AllParamsReset()
     DBG('------# reset loops & index')
     self.res.loops = 0
+    self.res.channels = nil
+    self.res.timeouts = nil
+    
     self.cache.index = 1
+    self.cache.timeout = nil
 end
 
-function WSync2Agent.instant:BroadcastGoodbye()
-    DBG('------# say goodbye too all peers')
-end
 
 function WSync2Agent.findMaxSize(size1, size2)
     if (size1 and size2) then
@@ -129,23 +121,87 @@ function WSync2Agent.findMaxSize(size1, size2)
 end
 
 
-function WSync2Agent.SayStatusAppend(path, msg)
-    local oldTxt = fread(path)
-    local txt = oldTxt .. msg
-    WSync2Agent.SayStatus(path, txt)
+function WSync2Agent.GetMsgType(config)
+    return WSync2Agent.parseConfig(config, 3)
 end
 
-function WSync2Agent.SayStatus(path, msg)
+function WSync2Agent.GetChannels(config)
+    return WSync2Agent.parseConfig(config, 1, 1)
+end
+
+function WSync2Agent.GetTimers(config)
+    return WSync2Agent.parseConfig(config, 2, 1)
+end
+
+function WSync2Agent.parseConfig(config, idx, flagTable)
+    local i = idx or 1
+    local cfg = ssplit(config, ':')
+    if (cfg and i <= #cfg) then
+        local vs = cfg[i]
+        if (not flagTable) then
+            return vs
+        end
+        
+        if (vs) then
+            local vl = ssplit(vs, ',')
+            return vl
+        end
+    end
+    return nil
+end
+
+
+function WSync2Agent.sayStatusAppend(path, msg)
+    local oldTxt = fread(path) or ''
+    local txt = oldTxt .. msg
+    WSync2Agent.sayStatus(path, txt)
+end
+
+function WSync2Agent.sayStatus(path, msg)
     local txt = sfmt('%s [%s]\n', msg or '-', dt())
     fwrite(path, txt)
 end
 
-function WSync2Agent.instant:Task(
-    channels, timeouts, 
-    stdout
+function WSync2Agent.writeLocalConfig(stdin, msg)
+    local lmsg = fread(stdin)
+    local lmtype = WSync2Agent.GetMsgType(lmsg)
+    DBG(sfmt('### local config: %s, mtype: %s', lmsg or '-', lmtype or '-'))
+    if (msg and lmtype and lmtype ~= 'cliset') then
+        fwrite(stdout, s)
+        fwrite(stdin, msg)
+    end
+end
+
+function WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
+    WSync2Agent.sayStatus(stdout, status)
+    WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
+end
+
+-- check local config type before write
+-- must not 'cliset'
+function WSync2Agent.instant:TaskLanSync(
+    stdin, stdout
+)
+    local msg, host, port = WSync2Agent.Comm.HearFromAllPeers(self.res.sockfd)
+    local s = sfmt('# heard from: %s:%s [%s]\n', 
+            host or '-', port or '-', msg or '-', dt())
+    DBG('========' .. s)
+    
+    WSync2Agent.writeLocalConfig(stdin, msg)
+end
+
+
+function WSync2Agent.instant:TaskLocalCountdown(
+    uinput, stdout
 )
     DBG("WSync2Agent.instant:Task()")
 
+    local port = self.conf.port
+    local sockfd = self.res.sockfd
+
+    local channels = WSync2Agent.GetChannels(uinput)
+    local timeouts = WSync2Agent.GetTimers(uinput)
+    
     self.res.channels = channels
     self.res.timeouts = timeouts
         
@@ -208,10 +264,14 @@ function WSync2Agent.instant:Task(
         
         -- allow multi-loops running, or only first loop
         if (self.res.loops < 1 or self.res.flagLoop) then
-            local sockfd = self.res.sockfd
             DBG(sfmt('------# doing wsync [%s in %s/%ss]', 
                     channel or '-', ltimeout or '-', timeout or '-'))
-            WSync2Agent.singleBroadcast(sockfd, channel, ltimeout)
+
+            -- tell all peer(s)
+            local msg = sfmt('%s:%s:m_set', channel or '', ltimeout or '')
+            WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
+
+            -- switch channel when timeup!
             WSync2Agent.doSwitchChannel(channel, ltimeout)
             
             -- save stat to tmp file
@@ -223,7 +283,7 @@ function WSync2Agent.instant:Task(
                 msg = sfmt('- Now! switching ch%s ...', 
                         channel or '-')
             end
-            WSync2Agent.SayStatusAppend(stdout, msg)
+            WSync2Agent.sayStatusAppend(stdout, msg)
             print('====' .. msg)
             
             -- save for next loop
@@ -232,14 +292,19 @@ function WSync2Agent.instant:Task(
             self.cache.timeout = ltimeout
         else
             DBG('------# single loop done (reason: single/no multi-loop)')
-            WSync2Agent.SayStatus(stdout, '- idle (reason: single/no multi-loop)')
+            local msg = '::m_hold'
+            local status = '- idle (reason: single/no multi-loop)'
+            WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
         end
 
         -- save index
         self.cache.index = i
     else
         DBG('------# bad channels or timeouts list (reason invalid channels/timeouts)')
-        WSync2Agent.SayStatus(stdout, '- idle (reason invalid channels/timeouts)')
+        
+        local msg = '::m_hold'
+        local status = '- idle (reason invalid channels/timeouts)'
+        WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
     end
 end
 
@@ -248,50 +313,11 @@ function WSync2Agent.doSwitchChannel(channel, ltimeout)
         local ltval = tonumber(ltimeout)
         if (ltval < 1) then
             DBG(sfmt('==========# switch to channel %s ...', channel))
-            ARNMngr.SAFE_SET('channel', channel)
+            --ARNMngr.SAFE_SET('channel', channel)
         end
     end
 end
 
-function WSync2Agent.instant:BroadcastGoodbye()
-    DBG('--------# say goodbye to all peers')
-    WSync2Agent.broadcastAll(self.res.sockfd, '::m_reset')
-end
-
--- TODO: get each peer(s) wmac, call rarp, conver to ip
--- send msg to each of them
-function WSync2Agent.broadcastAll(sockfd, msg)
-    if (sockfd and msg) then
-        DBG(sfmt('==========# broadcast to all peers: %s', msg))
-    else
-        DBG('--------# invalid socket or msg')
-    end
-end
-
--- handle single channel switching within timeout
-function WSync2Agent.singleBroadcast(sockfd, channel, timeout)
-    if (sockfd) then
-        local msg = '::m_set'
-        if (channel and timeout) then
-            local ch = tonumber(channel)
-            local to = tonumber(timeout)
-            DBG(sfmt('--------# msg: -> ch%s in %ss', ch, to))            
-            msg = sfmt('%s:%s:m_set', ch, to)
-        else
-            DBG('========# cancel all')
-        end
-        WSync2Agent.broadcastAll(sockfd, msg)
-    else
-        DBG('--------# invalid socket, channel or timeout value')
-        WSync2Agent.SayStatusWorking(stdout, '- idle (reason invalid socket)')
-    end
-end
-
-function WSync2Agent.idle(sec)
-    if (sec) then
-        Socket.sleep(tonumber(sec) or 1)
-    end
-end
 
 -- TODO: send stop & clear three times
 function WSync2Agent.instant:Cleanup()

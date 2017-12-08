@@ -113,7 +113,8 @@ function WSync.Run()
 
     -- do some preparation: check env, utils, etc.
     local waitTO = 0.2
-    local msg = DaemonAgent:Prepare(waitTO, WSync.conf.port)
+    local msg = DaemonAgent:Prepare(waitTO, WSync.conf.port, 
+            WSync.conf.protocol)
     
     -- reset user input by writing new channels or timeouts
     local stdin = WSync.conf._SWAP1
@@ -129,6 +130,9 @@ function WSync.Run()
                 break
             end
             
+            -- recv msg & save
+            DaemonAgent:TaskLanSync(stdin, stdout)
+            
             -- read user input
             local uinput = fread(stdin) -- ex: "21,15[,]"
             WSync.reply(sfmt("--> Agent-WSync: [%s] at %s", uinput or '', dt()))
@@ -136,12 +140,11 @@ function WSync.Run()
                 WSync.reply('========# triggered reset')
                 DaemonAgent:AllParamsReset()
             end
-
-            channelList = WSync.GetChannels(uinput)
-            timeoutList = WSync.GetTimers(uinput)
             
             -- run as user requested
-            DaemonAgent:Task(channelList, timeoutList, stdout)
+            DaemonAgent:TaskLocalCountdown(uinput, stdout)
+            
+            -- print status
             WSync.reply(sfmt("--> Agent-WSync synced +%s", dt()))
             
             DaemonAgent:Idle(WSync.conf.interval)
@@ -162,28 +165,6 @@ function WSync.Run()
     local s = sfmt("-> stopped +%s", dt())
     WSync.reply(s)
     WSync.log(s)
-end
-
-
-function WSync.GetChannels(config)
-    return WSync.parseConfig(config, 1)
-end
-
-function WSync.GetTimers(config)
-    return WSync.parseConfig(config, 2)
-end
-
-function WSync.parseConfig(config, idx)
-    local i = idx or 1
-    local cfg = ssplit(config, ':')
-    if (cfg) then
-        local vs = cfg[i]
-        if (vs) then
-            local vl = ssplit(vs, ',')
-            return vl
-        end
-    end
-    return nil
 end
 
 
