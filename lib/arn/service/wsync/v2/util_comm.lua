@@ -6,8 +6,10 @@ local DBG = function(msg) end
 
 local Socket = require 'socket'
 local ARNMngr = require 'arn.device.mngr'
-local RARP      = require 'arn.utils.rarp'
+local RARP = require 'arn.utils.rarp'
+local CCFF = require 'arn.utils.ccff'
 
+local ssplit = CCFF.split
 local sfmt = string.format
 local tbl_push = table.insert
 
@@ -70,12 +72,20 @@ function WSync2Comm.HearFromAllPeers(sockfd, length)
     local host = nil
     local port = nil
     if (sockfd) then
-        msg, host, port = sockfd:receivefrom(tonumber(length) or 16)
+        -- FIXME: receive all, find the last msg
+        msgRaw, host, port = sockfd:receivefrom(tonumber(length) or 64)
+        if (msgRaw) then
+            local msgs = ssplit(msgRaw, '\n')
+            if (msgs) then
+                local msgQty = #msgs
+                msg = msgs[msgQty]
+            end
+        end
     end
     return msg, host, port
 end
 
--- TODO: get each peer(s) wmac, call rarp, conver to ip
+-- get each peer(s) wmac, call rarp, conver to ip
 -- send msg to each of them
 function WSync2Comm.TellEveryPeerMsg(sockfd, port, msg)
     DBG('--------# TellEveryPeerMsg')
@@ -94,7 +104,7 @@ end
 
 function WSync2Comm.tellPeerMsg(sockfd, host, port, msg)
     if (sockfd and host and port and msg) then
-        print(sfmt('--------# send [%s] to %s:%s', msg, host, port))
+        DBG(sfmt('--------# send [%s] to %s:%s', msg, host, port))
         sockfd:sendto(msg, socket.dns.toip(host), port)
     end
 end

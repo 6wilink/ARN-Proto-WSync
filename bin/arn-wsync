@@ -9,19 +9,19 @@ AGENT_SWAP2=/tmp/.stat.wsync2.tmp
 case $1 in
     status|stat|now)
         echo '(channel:timer)'
-        touch $AGENT_SWAP1; cat $AGENT_SWAP1; echo
+        touch $AGENT_SWAP1; cat $AGENT_SWAP1
         echo '* status of Agent'
         echo -n '' > $AGENT_SWAP2
         tail -q -f $AGENT_SWAP2
         ;;
-    clear|reset|hold|stop)
+    clear|reset|stop)
         echo 'configuring Agent'
-        echo -n "::cliset" > $AGENT_SWAP1
+        echo "::cliset" > $AGENT_SWAP1
         echo -n '' > $AGENT_SWAP2
         ;;
     sync|conf|set)
         echo 'configuring Agent'
-        echo -n "$2:$3:cliset" > $AGENT_SWAP1
+        echo "$2:$3:cliset" > $AGENT_SWAP1
         echo -n '' > $AGENT_SWAP2
         ;;
     end|quit|bye)
@@ -31,6 +31,7 @@ case $1 in
     start|begin|run|go|?|*)
         echo 'starting Agent'
         echo '::cliset' > $AGENT_SWAP1 # boot() disable wsync
+        echo -n '' > $AGENT_SWAP2
         $AGENT >/dev/null 2>&1 &
         ;;
 esac

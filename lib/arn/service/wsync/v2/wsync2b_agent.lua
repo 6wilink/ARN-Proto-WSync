@@ -1,8 +1,8 @@
 -- by Qige <qigezhao@gmail.com>
 -- 2017.10.20 ARN iOMC v3.0-alpha-201017Q
 
-local DBG = print
---local DBG = function(msg) end
+--local DBG = print
+local DBG = function(msg) end
 
 local CCFF      = require 'arn.utils.ccff'
 local ARNMngr   = require 'arn.device.mngr'
@@ -166,7 +166,7 @@ function WSync2Agent.writeLocalConfig(stdin, msg)
     local lmtype = WSync2Agent.GetMsgType(lmsg)
     DBG(sfmt('### local config: %s, mtype: %s', lmsg or '-', lmtype or '-'))
     -- overwrite local config if not user defined
-    if (msg and lmtype ~= 'cliset') then
+    if (msg and lmtype ~= 'cliset' and lmtype ~= 'cliset\n') then
         fwrite(stdout, s)
         fwrite(stdin, msg)
     end
@@ -185,7 +185,7 @@ function WSync2Agent.instant:TaskLanSync(
     local msg, host, port = WSync2Agent.Comm.HearFromAllPeers(self.res.sockfd)
     local s = sfmt('# heard from: %s:%s [%s]\n',
             host or '-', port or '-', msg or '-', dt())
-    DBG('========' .. s)
+    print('========' .. s)
 
     WSync2Agent.writeLocalConfig(stdin, msg)
 end
@@ -246,7 +246,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
             i = sizeTimeoutsList
         end
         -- find valid timeout
-        local timeout = timeouts[i] - 1
+        local timeout = tonumber(timeouts[i])
 
         -- check cache timeout
         i = self.cache.index -- reload index, remove list size filter
@@ -267,7 +267,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
                     channel or '-', ltimeout or '-', timeout or '-'))
 
             -- tell all peer(s)
-            local msg = sfmt('%s:%s:m_set', channel or '', ltimeout or '')
+            local msg = sfmt('%s:%s:m_set\n', channel or '', ltimeout or '')
             WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
 
             -- switch channel when timeup!
@@ -276,10 +276,10 @@ function WSync2Agent.instant:TaskLocalCountdown(
             -- save stat to tmp file
             local msg = nil
             if (ltimeout > 0) then
-                msg = sfmt('- T- %s: switch to ch%s in %ss',
+                msg = sfmt('> T- %s: switch to ch%s in %ss',
                         timeout or '-', channel or '-', ltimeout or '-')
             else
-                msg = sfmt('- Now! switching ch%s ...',
+                msg = sfmt('# NOW! Switching CHANNEL %s ...',
                         channel or '-')
             end
             WSync2Agent.sayStatusAppend(stdout, msg)
@@ -305,6 +305,8 @@ function WSync2Agent.instant:TaskLocalCountdown(
         local status = '- idle (reason invalid channels/timeouts)'
         WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
     end
+    
+    print(sfmt('-------- -------- [%s] -------- --------', dt()))
 end
 
 function WSync2Agent.doSwitchChannel(channel, ltimeout)
