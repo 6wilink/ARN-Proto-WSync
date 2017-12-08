@@ -2,8 +2,8 @@
 -- 2017.12.06 ARN-Proto-WSync
 
 -- DEBUG USE ONLY
-local DBG = print
---local function DBG(msg) end
+--local DBG = print
+local function DBG(msg) end
 
 local CCFF = require 'arn.utils.ccff'
 local WSyncAgent = require 'arn.service.wsync.v2.wsync2b_agent'
@@ -28,7 +28,7 @@ WSync.conf.enabled = cget('arn-wsyncd','v2','enabled') or '0'
 WSync.conf.flagLoop = cget('arn-wsyncd','v2','loop') or '0'
 WSync.conf.protocol = cget('arn-wsyncd','v2','protocol') or 'udp'
 WSync.conf.port = cget('arn-wsyncd','v2','port') or 3003
-WSync.conf.interval = 1--cget('arn-wsyncd','v2','interval') or 1
+WSync.conf.interval = cget('arn-wsyncd','v2','interval') or 1
 WSync.conf.channel = nil
 WSync.conf.timeout = nil
 WSync.conf._STDOUT = nil
@@ -131,10 +131,16 @@ function WSync.Run()
             end
             
             -- recv msg & save
-            DaemonAgent:TaskLanSync(stdin, stdout)
+            local msg = DaemonAgent:TaskLanSync(stdin, stdout)
+            if (msg) then
+                WSync.reply(sfmt("--> Heard: [%s] at %s", msg or '', dt()))
+            else
+                WSync.reply(sfmt("--> Heard: timeout at %s", dt()))
+            end
             
             -- read user input
-            local uinput = fread(stdin) -- ex: "21,15[,]"
+            local uinputRaw = fread(stdin) -- ex: "21,15[,]"
+            local uinput = string.gsub(uinputRaw, '\n', '')
             WSync.reply(sfmt("--> Agent-WSync: [%s] at %s", uinput or '', dt()))
             if (WSync.triggerReset(uinput, uinputLast)) then
                 WSync.reply('========# triggered reset')
