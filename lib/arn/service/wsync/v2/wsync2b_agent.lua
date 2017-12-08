@@ -162,11 +162,13 @@ function WSync2Agent.sayStatus(path, msg)
 end
 
 function WSync2Agent.writeLocalConfig(stdin, msg)
-    local lmsg = fread(stdin)
-    local lmtype = WSync2Agent.GetMsgType(lmsg)
-    DBG(sfmt('### local config: %s, mtype: %s', lmsg or '-', lmtype or '-'))
+    local lmsgRaw = fread(stdin)
+    local lmsg = string.gsub(lmsgRaw, '\n', '')
+    local lmtype = WSync2Agent.GetMsgType(lmsg) or ''
+    DBG(sfmt('### local config: %s, local mtype: %s', lmsg or '-', lmtype or '-'))
     -- overwrite local config if not user defined
-    if (msg and lmtype ~= 'cliset' and lmtype ~= 'cliset\n') then
+    local flagLocalUserDefined = string.find(lmtype, 'cliset')
+    if (msg and lmtype and (not flagLocalUserDefined)) then
         fwrite(stdout, s)
         fwrite(stdin, msg)
     end
@@ -185,9 +187,10 @@ function WSync2Agent.instant:TaskLanSync(
     local msg, host, port = WSync2Agent.Comm.HearFromAllPeers(self.res.sockfd)
     local s = sfmt('# heard from: %s:%s [%s]\n',
             host or '-', port or '-', msg or '-', dt())
-    print('========' .. s)
+    DBG('========' .. s)
 
     WSync2Agent.writeLocalConfig(stdin, msg)
+    return msg
 end
 
 function WSync2Agent.instant:TaskLocalCountdown(
@@ -234,7 +237,7 @@ function WSync2Agent.instant:TaskLocalCountdown(
             self.res.loops = loops + 1
         end
         -- find valid channel here
-        local channel = channels[i]
+        local channel = tonumber(channels[i]) or 0
 
 
         -- find valid index: force between 1 to sizeTimeoutsList
@@ -262,37 +265,44 @@ function WSync2Agent.instant:TaskLocalCountdown(
         end
 
         -- allow multi-loops running, or only first loop
-        if (self.res.loops < 1 or self.res.flagLoop) then
-            DBG(sfmt('------# doing wsync [%s in %s/%ss]',
-                    channel or '-', ltimeout or '-', timeout or '-'))
+        if (channel > 0) then
+            if (self.res.loops < 1 or self.res.flagLoop) then
+                DBG(sfmt('------# doing wsync [%s in %s/%ss]',
+                        channel or '-', ltimeout or '-', timeout or '-'))
 
-            -- tell all peer(s)
-            local msg = sfmt('%s:%s:m_set\n', channel or '', ltimeout or '')
-            WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
+                -- tell all peer(s)
+                local msg = sfmt('%s:%s:m_set\n', channel or '', ltimeout or '')
+                WSync2Agent.Comm.TellEveryPeerMsg(sockfd, port, msg)
 
-            -- switch channel when timeup!
-            WSync2Agent.doSwitchChannel(channel, ltimeout)
+                -- switch channel when timeup!
+                WSync2Agent.doSwitchChannel(channel, ltimeout)
 
-            -- save stat to tmp file
-            local msg = nil
-            if (ltimeout > 0) then
-                msg = sfmt('> T- %s: switch to ch%s in %ss',
-                        timeout or '-', channel or '-', ltimeout or '-')
+                -- save stat to tmp file
+                local msg = nil
+                if (ltimeout > 0) then
+                    msg = sfmt('> T- %s: switch to ch%s in %ss',
+                            timeout or '-', channel or '-', ltimeout or '-')
+                else
+                    msg = sfmt('# NOW! Switching CHANNEL %s ...',
+                            channel or '-')
+                end
+                WSync2Agent.sayStatusAppend(stdout, msg)
+                print('====' .. msg)
+
+                -- save for next loop
+                ltimeout = ltimeout - 1
+                self.cache.target = channel
+                self.cache.timeout = ltimeout
             else
-                msg = sfmt('# NOW! Switching CHANNEL %s ...',
-                        channel or '-')
+                DBG('------# single loop done (reason: single/no multi-loop)')
+                local msg = '::m_hold'
+                local status = '- idle (reason: single/no multi-loop)'
+                WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
             end
-            WSync2Agent.sayStatusAppend(stdout, msg)
-            print('====' .. msg)
-
-            -- save for next loop
-            ltimeout = ltimeout - 1
-            self.cache.target = channel
-            self.cache.timeout = ltimeout
         else
-            DBG('------# single loop done (reason: single/no multi-loop)')
-            local msg = '::m_hold'
-            local status = '- idle (reason: single/no multi-loop)'
+            DBG('------# single loop done (reason: invalid next channel)')
+            local msg = '0:0:m_hold'
+            local status = '- idle (reason: invalid next channel)'
             WSync2Agent.freeRunIdle(stdout, status, sockfd, port, msg)
         end
 
