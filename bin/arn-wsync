@@ -14,7 +14,7 @@ case $1 in
         echo -n '' > $AGENT_SWAP2
         tail -q -f $AGENT_SWAP2
         ;;
-    clear|reset|stop)
+    hold|reset|end|clean|clear)
         echo 'configuring Agent'
         echo "0:0:cliset" > $AGENT_SWAP1
         echo -n '' > $AGENT_SWAP2
@@ -24,7 +24,7 @@ case $1 in
         echo "$2:$3:cliset" > $AGENT_SWAP1
         echo -n '' > $AGENT_SWAP2
         ;;
-    end|quit|bye)
+    stop|quit|bye)
         echo 'stopping Agent'
         echo "stop" > $AGENT_SIG
         ;;

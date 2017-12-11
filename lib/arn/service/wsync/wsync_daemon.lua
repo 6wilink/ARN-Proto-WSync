@@ -127,7 +127,7 @@ function WSync.Run()
         while true do
             -- check "quit" before do anything
             if (WSync.QUIT_SIGNAL()) then
-                DaemonAgent:BroadcastGoodbye()
+                DaemonAgent:TellEveryPeerMsg('0:0:m_bye')
                 break
             end
             

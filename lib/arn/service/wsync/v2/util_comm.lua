@@ -109,4 +109,10 @@ function WSync2Comm.tellPeerMsg(sockfd, host, port, msg)
     end
 end
 
+function WSync2Comm.Close(sockfd)
+    if (sockfd) then
+        sockfd:close()
+    end
+end
+
 return WSync2Comm
