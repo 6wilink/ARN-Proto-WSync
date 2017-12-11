@@ -325,7 +325,7 @@ function WSync2Agent.doSwitchChannel(channel, ltimeout)
         local ltval = tonumber(ltimeout)
         if (ltval < 1) then
             DBG(sfmt('==========# switch to channel %s ...', channel))
-            --ARNMngr.SAFE_SET('channel', channel)
+            ARNMngr.SAFE_SET('channel', channel)
         end
     end
 end
