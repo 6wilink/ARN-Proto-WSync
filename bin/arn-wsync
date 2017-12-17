@@ -14,9 +14,9 @@ case $1 in
         echo -n '' > $AGENT_SWAP2
         tail -q -f $AGENT_SWAP2
         ;;
-    hold|reset|end|clean|clear)
+    pause|hold|reset|end|clean|clear)
         echo 'configuring Agent'
-        echo "0:0:cliset" > $AGENT_SWAP1
+        echo "0:0:usr_hold" > $AGENT_SWAP1
         echo -n '' > $AGENT_SWAP2
         ;;
     sync|conf|set)
@@ -30,7 +30,7 @@ case $1 in
         ;;
     start|begin|run|go|?|*)
         echo 'starting Agent'
-        echo '0:0:cliset' > $AGENT_SWAP1 # boot() disable wsync
+        echo '0:0:sys_boot' > $AGENT_SWAP1 # boot() disable wsync
         echo -n '' > $AGENT_SWAP2
         $AGENT >/dev/null 2>&1 &
         ;;
