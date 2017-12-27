@@ -7,31 +7,31 @@ AGENT_SWAP1=/tmp/.conf.wsync2.tmp
 AGENT_SWAP2=/tmp/.stat.wsync2.tmp
 
 case $1 in
-    status|stat|now)
+  boot|daemon)
+      echo 'starting Agent'
+      echo '0:0:sys_boot' > $AGENT_SWAP1 # boot() disable wsync
+      echo -n '' > $AGENT_SWAP2
+      $AGENT >/dev/null 2>&1 &
+      ;;
+    pause|hold|reset|clean|clear)
+        echo 'configuring Agent'
+        echo "0:0:usr_hold" > $AGENT_SWAP1
+        echo -n '' > $AGENT_SWAP2
+        ;;
+    start|sync|conf|set)
+        echo 'configuring Agent'
+        echo "$2:$3:cliset" > $AGENT_SWAP1
+        echo -n '' > $AGENT_SWAP2
+        ;;
+    quit|bye|end)
+        echo 'stopping Agent'
+        echo "stop" > $AGENT_SIG
+        ;;
+    status|stat|now|?|*)
         echo '(channel:timer)'
         touch $AGENT_SWAP1; cat $AGENT_SWAP1
         echo '* status of Agent'
         echo -n '' > $AGENT_SWAP2
         tail -q -f $AGENT_SWAP2
-        ;;
-    pause|hold|reset|end|clean|clear)
-        echo 'configuring Agent'
-        echo "0:0:usr_hold" > $AGENT_SWAP1
-        echo -n '' > $AGENT_SWAP2
-        ;;
-    sync|conf|set)
-        echo 'configuring Agent'
-        echo "$2:$3:cliset" > $AGENT_SWAP1
-        echo -n '' > $AGENT_SWAP2
-        ;;
-    stop|quit|bye)
-        echo 'stopping Agent'
-        echo "stop" > $AGENT_SIG
-        ;;
-    start|begin|run|go|?|*)
-        echo 'starting Agent'
-        echo '0:0:sys_boot' > $AGENT_SWAP1 # boot() disable wsync
-        echo -n '' > $AGENT_SWAP2
-        $AGENT >/dev/null 2>&1 &
         ;;
 esac
