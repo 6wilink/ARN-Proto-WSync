@@ -1,0 +1,23 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=99
+
+CONF=/etc/config/arn-wsyncd
+CMD=/usr/sbin/arn-wsync
+
+start() {
+    if [ -f "$CONF" ]; then
+        echo "- run agents by config file"
+    else
+        echo "* conf file missing, using default settings"
+    fi
+
+    # run agents, they will determin if enabled
+    $CMD start >/dev/null 2&>1
+}
+
+stop() {
+    # stop agents
+    $CMD stop >/dev/null 2&>1
+}

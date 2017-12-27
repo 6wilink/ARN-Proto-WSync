@@ -1,0 +1,6 @@
+config arn-wsync 'v2'
+    option enabled '1'
+	option loop '0'
+    option port 3003
+    option protocol 'udp'
+    option interval 1
